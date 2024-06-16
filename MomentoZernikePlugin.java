@@ -3,6 +3,7 @@ package plugins;/*Exemplo plugin para k-nearest
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Map;
 
 import ij.*;
 import ij.io.*;
@@ -15,7 +16,7 @@ import ij.plugin.filter.*;
 public class _MomentoZernikePlugin implements PlugInFilter {
     ImagePlus reference;        // Reference image
     int k;                      // Number of nearest neighbors
-    int level;                  // Wavelet decoposition level
+    Map<String, ImageAccess> imagesByName;
 
     public int setup(String arg, ImagePlus imp) {
         reference = imp;
@@ -26,14 +27,7 @@ public class _MomentoZernikePlugin implements PlugInFilter {
 
     public void run(ImageProcessor img) {
 
-        ImageAccess[] imagemBase;
-        double nDist;
-        double[][] distancias;
-        ImagePlus reference;
-        int k;
         int n;
-        String[] nomes;
-
 
         GenericDialog gd = new GenericDialog("Momentos de Zernike", IJ.getInstance());
         gd.addNumericField("Número 'k' de vizinhos a serem buscados: ", 5, 0);
@@ -49,14 +43,16 @@ public class _MomentoZernikePlugin implements PlugInFilter {
         DistanceCalculator distanceCalculator;
         switch (distancia) {
             case "Euclidiana":
-                distanceCalculator = new DistanciaEuclidiana();
+                distanceCalculator = new EuclideanDistance();
                 break;
             case "Manhattan":
-                distanceCalculator = new DistanciaManhattan();
+                distanceCalculator = new EuclideanDistance();
                 break;
             case "Chebyshev":
-                distanceCalculator = new DistanciaChebyshev();
+                distanceCalculator = new EuclideanDistance();
                 break;
+            default:
+                distanceCalculator = new EuclideanDistance();
         }
 
         SaveDialog sd = new SaveDialog("Escolha seu diretório", "Algum arquivo (necessário)", "");
@@ -64,15 +60,35 @@ public class _MomentoZernikePlugin implements PlugInFilter {
         String dir = sd.getDirectory();
 
 
-        ArrayList<double[]> caracteristicas;
+        ArrayList<ImageData> caracteristicas;
+        ArrayList<ImageData> k_nearest;
         try {
             caracteristicas = caracteristicasDiretorio(dir, n);
-        } catch (Exception e) {
+            CsvExporter.exportToCsv(caracteristicas, "features.csv");
+            KNN knn = new KNN(k, distanceCalculator);
+            k_nearest = knn.getKNN(caracteristicas, reference.getTitle());
+        }
+        catch (Exception e) {
             throw new RuntimeException(e);
         }
+
+        int i = 1;
+        double precisao = 0;
+        String targetClass = reference.getTitle().replaceAll("[^a-z]","");
+        for(ImageData imag: k_nearest){
+            imagesByName.get(imag.getImageName()).show("Imagem semelhante número: " + i);
+            i++;
+            IJ.log(imag.getImageName());
+
+            String currentClass = imag.getImageName().replaceAll("[^a-z]","");
+            if(currentClass.equals(targetClass)){
+                precisao += 1./k;
+            }
+        }
+        IJ.log("Precisão: " + String.format("%.3f", precisao));
     }
 
-    public ArrayList<double[]> caracteristicasDiretorio(String dir, int n) throws Exception{
+    public ArrayList<ImageData> caracteristicasDiretorio(String dir, int n) throws Exception{
         IJ.log("");
         IJ.log("Searching images");
 
@@ -82,7 +98,7 @@ public class _MomentoZernikePlugin implements PlugInFilter {
         String[] list = new File(dir).list();  /* lista de arquivos */
         if (list == null) throw new Exception("Erro: diretorio vazio.");
 
-        ArrayList<double[]> vetoresCaracteristicas = new ArrayList<>();
+        ArrayList<ImageData> vetoresCaracteristicas = new ArrayList<>();
 
         for (int i=0; i<list.length; i++) {
             IJ.showStatus(i+"/"+list.length+": "+list[i]);   /* mostra na interface */
@@ -90,96 +106,21 @@ public class _MomentoZernikePlugin implements PlugInFilter {
             File f = new File(dir+list[i]);
             if (!f.isDirectory()) {
                 ImagePlus image = new Opener().openImage(dir, list[i]); /* abre imagem image */
+
                 if (image != null) {
 
-                    // CODIGO para inverter a imagem:
                     ImageAccess input = new ImageAccess(image.getProcessor());
+                    imagesByName.put(image.getTitle(), input);
                     int nx = input.getWidth();
                     int ny = input.getHeight();
-                    vetoresCaracteristicas.add(Zernike.getFeatures(n, nx, ny, input));
+                    vetoresCaracteristicas.add(new ImageData(plugins.Zernike.getFeatures(n, nx, ny, input), image.getTitle()));
                 }
+
             }
         }
         IJ.showProgress(1.0);
         IJ.showStatus("");
 
         return vetoresCaracteristicas;
-    }
-
-    private class ImageData {
-        private double[] data;
-        private String imageName;
-
-        public ImageData(double[] data, String imageNAme) {
-
-        }
-
-        public double[] getData() {
-            return data;
-        }
-    }
-
-    private void saveToCsv(ArrayList<double[]> data, String filename) {
-        try (PrintWriter writer = new PrintWriter(new FileWriter(filename)))
-        {
-            for (double[] row : data) {
-                writer.print(imageNames[j] + ",");
-
-                for (int i = 0; i < row.length; i++) {
-                    writer.print(row[i]);
-                    if (i < row.length - 1) writer.print(",");
-                }
-            }
-            for (int j = 0; j < caracteristicas.length; j++) {
-                double[] row = caracteristicas[j];
-
-                for (int i = 0; i < row.length; i++) {
-                    writer.print(row[i]);
-                    if (i < row.length - 1) writer.print(",");
-                }
-                writer.println();
-            }
-            writer.close();
-        }
-        catch (IOException e)
-        {
-            IJ.log("\n" + e.getMessage());
-        }
-    }
-
-    private interface DistanceCalculator {
-        double distance(double[] p1, double[] p2);
-    }
-
-    private class DistanciaManhattan implements DistanceCalculator {
-        @Override
-        public double distance(double[] p1, double[] p2) {
-            double dist = 0.0;
-            for (int i=0;i<Math.min(p1.length,p2.length);i++) {
-                dist += Math.abs(p1[i]-p2[i]);
-            }
-            return dist;
-        }
-    }
-
-    private class DistanciaEuclidiana implements DistanceCalculator {
-        @Override
-        public double distance(double[] p1, double[] p2) {
-            double dist = 0.0;
-            for (int i=0;i<Math.min(p1.length,p2.length);i++) {
-                dist += (p1[i]-p2[i])*(p1[i]-p2[i]);
-            }
-            return Math.sqrt(dist);
-        }
-    }
-    private class DistanciaChebyshev implements DistanceCalculator {
-        @Override
-        public double distance(double[] p1, double[] p2) {
-            double dist = 0.0;
-            for (int i=0;i<Math.min(p1.length,p2.length);i++) {
-                dist = Math.max(dist, Math.abs(p1[i]-p2[i]));
-            }
-            return dist;
-        }
     }
 }
