@@ -1,4 +1,4 @@
-package plugins;
+
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -31,7 +31,7 @@ public class KNN {
         }
     }
 
-    public List<ImageData> getKNN(ArrayList<ImageData> images, String imageName) {
+    public List<ImageData> getKNN(List<ImageData> images, String imageName) {
         ImageData reference = images.stream().filter(img -> img.getImageName().equals(imageName)).collect(Collectors.toList()).get(0);
         return images.stream().filter(img -> !img.getImageName().equals(reference.getImageName())).map(img -> new ImageWithDistance(img, distanceCalculator.getDistance(img.getFeatures(), reference.getFeatures()))).sorted(Comparator.comparingDouble(ImageWithDistance::getDistance)).limit(k).map(ImageWithDistance::getImg).collect(Collectors.toList());
     }

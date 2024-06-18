@@ -1,4 +1,4 @@
-package plugins;
+
 
 public class EuclideanDistance implements DistanceCalculator {
     @Override

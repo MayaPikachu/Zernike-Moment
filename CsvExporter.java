@@ -1,4 +1,4 @@
-package plugins;
+
 
 import ij.IJ;
 
@@ -6,12 +6,13 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.List;
 
 public class CsvExporter {
-    public static void exportToCsv(ArrayList<plugins.ImageData> images, String filename) {
+    public static void exportToCsv(List<ImageData> images, String filename) {
         try (PrintWriter writer = new PrintWriter(new FileWriter(filename)))
         {
-            for (plugins.ImageData image: images) {
+            for (ImageData image: images) {
                 double[] row = image.getFeatures();
 
                 writer.print(image.getImageName() + ",");

@@ -1,4 +1,3 @@
-package plugins;
 
 public class ManhattanDistance implements DistanceCalculator {
     @Override

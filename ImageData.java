@@ -1,4 +1,4 @@
-package plugins;
+
 
 public class ImageData {
     private double[] features;

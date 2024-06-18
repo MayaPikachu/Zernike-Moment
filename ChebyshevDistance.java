@@ -1,4 +1,4 @@
-package plugins;
+
 
 public class ChebyshevDistance implements DistanceCalculator {
     @Override
